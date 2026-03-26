@@ -1,10 +1,11 @@
-"""LLM client for intent detection and natural language processing."""
+"""LLM client with tool calling support."""
 
 import httpx
+import json
 
 
 class LLMClient:
-    """Client for LLM API (Qwen Code or similar)."""
+    """Client for LLM API (Qwen Code) with tool calling."""
 
     def __init__(self, api_key: str, base_url: str, model: str):
         """Initialize LLM client.
@@ -25,13 +26,18 @@ class LLMClient:
             },
         )
         self._available = None
+        self._tools = []
+
+    def set_tools(self, tools: list[dict]) -> None:
+        """Set available tools for the LLM.
+        
+        Args:
+            tools: List of tool definitions in OpenAI format.
+        """
+        self._tools = tools
 
     async def is_available(self) -> bool:
-        """Check if LLM API is available.
-        
-        Returns:
-            True if LLM API is reachable and responding.
-        """
+        """Check if LLM API is available."""
         if self._available is not None:
             return self._available
         
@@ -43,102 +49,222 @@ class LLMClient:
             self._available = False
             return False
 
-    async def chat(self, messages: list[dict]) -> str:
-        """Send a chat completion request.
+    async def chat_with_tools(self, messages: list[dict]) -> dict:
+        """Send a chat completion request with tool calling.
         
         Args:
             messages: List of message dicts with 'role' and 'content'.
             
         Returns:
-            AI response text.
+            Dict with 'response' text and optional 'tool_calls'.
         """
+        payload = {
+            "model": self.model,
+            "messages": messages,
+        }
+        
+        if self._tools:
+            payload["tools"] = self._tools
+            payload["tool_choice"] = "auto"
+        
         try:
             resp = await self._client.post(
                 f"{self.base_url}/chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                },
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()
-            return data["choices"][0]["message"]["content"]
+            
+            choice = data["choices"][0]["message"]
+            result = {"response": choice.get("content", ""), "tool_calls": []}
+            
+            if "tool_calls" in choice:
+                for tc in choice["tool_calls"]:
+                    result["tool_calls"].append({
+                        "name": tc["function"]["name"],
+                        "arguments": json.loads(tc["function"]["arguments"]),
+                    })
+            
+            return result
         except httpx.HTTPError as e:
-            return f"LLM error: {e}"
-
-    async def detect_intent(self, user_message: str) -> dict:
-        """Detect user intent from natural language message.
-        
-        Args:
-            user_message: User's natural language query.
-            
-        Returns:
-            Dict with 'intent', 'confidence', and 'parameters'.
-        """
-        system_prompt = """You are an intent classifier for an LMS (Learning Management System) Telegram bot.
-Classify the user's message into one of these intents:
-- "health" - checking if backend/system is working
-- "labs" - asking about available labs
-- "scores" - asking about scores/grades/pass rates for a specific lab
-- "help" - asking for help or available commands
-- "greeting" - saying hello/hi
-- "unknown" - none of the above
-
-Respond ONLY with a JSON object in this format:
-{"intent": "intent_name", "confidence": 0.9, "parameters": {"lab": "lab-04"}}
-
-Examples:
-- "is the backend working?" → {"intent": "health", "confidence": 0.95, "parameters": {}}
-- "what labs are available?" → {"intent": "labs", "confidence": 0.95, "parameters": {}}
-- "show me scores for lab 04" → {"intent": "scores", "confidence": 0.9, "parameters": {"lab": "lab-04"}}
-- "help me" → {"intent": "help", "confidence": 0.95, "parameters": {}}
-- "hello" → {"intent": "greeting", "confidence": 0.95, "parameters": {}}
-"""
-
-        try:
-            response = await self.chat([
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ])
-            
-            # Parse the JSON response
-            import json
-            # Try to extract JSON from response
-            start = response.find("{")
-            end = response.rfind("}") + 1
-            if start >= 0 and end > start:
-                json_str = response[start:end]
-                return json.loads(json_str)
-            else:
-                return {"intent": "unknown", "confidence": 0.5, "parameters": {}}
-        except Exception:
-            return {"intent": "unknown", "confidence": 0.5, "parameters": {}}
-
-    async def answer_query(self, user_message: str, context: dict) -> str:
-        """Answer a user query using LLM with context.
-        
-        Args:
-            user_message: User's question.
-            context: Additional context (labs data, scores, etc.).
-            
-        Returns:
-            AI-generated answer.
-        """
-        system_prompt = """You are a helpful assistant for an LMS (Learning Management System).
-Help students check their lab submissions, scores, and understand the system.
-Be friendly, concise, and helpful. Use the provided context to answer questions."""
-
-        context_str = "\n".join(f"{k}: {v}" for k, v in context.items())
-        
-        try:
-            return await self.chat([
-                {"role": "system", "content": system_prompt},
-                {"role": "system", "content": f"Context:\n{context_str}"},
-                {"role": "user", "content": user_message},
-            ])
-        except Exception as e:
-            return f"Sorry, I couldn't process that. Try using commands like /help, /labs, or /scores."
+            return {"response": f"LLM error: {e}", "tool_calls": []}
 
     async def close(self) -> None:
         """Close the HTTP client."""
         await self._client.aclose()
+
+
+def get_bot_tools() -> list[dict]:
+    """Define all available tools for the bot.
+    
+    Returns:
+        List of tool definitions in OpenAI format.
+    """
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_health_status",
+                "description": "Check if the LMS backend is healthy and get item count",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_labs",
+                "description": "Get list of all available labs with descriptions",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_scores_for_lab",
+                "description": "Get pass rates and scores for a specific lab",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lab": {
+                            "type": "string",
+                            "description": "Lab identifier (e.g., 'lab-01', 'lab-04')",
+                        },
+                    },
+                    "required": ["lab"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_learners",
+                "description": "Get list of enrolled students/learners",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_score_distribution",
+                "description": "Get score distribution (4 buckets) for a lab",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lab": {
+                            "type": "string",
+                            "description": "Lab identifier",
+                        },
+                    },
+                    "required": ["lab"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_timeline",
+                "description": "Get submission timeline for a lab",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lab": {
+                            "type": "string",
+                            "description": "Lab identifier",
+                        },
+                    },
+                    "required": ["lab"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_group_performance",
+                "description": "Get per-group performance for a lab",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lab": {
+                            "type": "string",
+                            "description": "Lab identifier",
+                        },
+                    },
+                    "required": ["lab"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_top_learners",
+                "description": "Get top N learners for a lab",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lab": {
+                            "type": "string",
+                            "description": "Lab identifier",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Number of top learners (default: 5)",
+                        },
+                    },
+                    "required": ["lab"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_completion_rate",
+                "description": "Get completion rate percentage for a lab",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "lab": {
+                            "type": "string",
+                            "description": "Lab identifier",
+                        },
+                    },
+                    "required": ["lab"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "sync_data",
+                "description": "Trigger ETL sync to fetch latest data from autochecker",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_help",
+                "description": "Get list of available commands and how to use the bot",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+    ]

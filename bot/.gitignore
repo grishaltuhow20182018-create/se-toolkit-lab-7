@@ -1,0 +1,21 @@
+# Bot-specific gitignore
+
+# Environment secrets
+.env.bot.secret
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

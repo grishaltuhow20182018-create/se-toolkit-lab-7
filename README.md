@@ -95,3 +95,117 @@ By the end of this lab, you should be able to say:
 ### Optional
 
 1. [Flutter Web Chatbot](./lab/tasks/optional/task-1.md)
+
+## Deploy
+
+### Prerequisites
+
+- VM with Docker installed
+- `.env.docker.secret` file with all required environment variables
+- Bot token from @BotFather
+- LLM API key (Qwen Code or OpenRouter)
+
+### Environment Setup
+
+Create `.env.docker.secret` in the project root:
+
+```bash
+cp .env.docker.example .env.docker.secret
+nano .env.docker.secret
+```
+
+Required variables:
+
+```bash
+# Bot
+BOT_TOKEN=your-bot-token-from-botfather
+LMS_API_KEY=your-lms-api-key
+LLM_API_KEY=your-llm-api-key
+LLM_API_MODEL=coder-model
+
+# Autochecker (for ETL)
+AUTOCHECKER_API_LOGIN=your-email@innopolis.university
+AUTOCHECKER_API_PASSWORD=your-github-username-your-telegram-alias
+
+# Backend
+BACKEND_NAME="Learning Management Service"
+BACKEND_DEBUG=false
+BACKEND_CONTAINER_ADDRESS=0.0.0.0
+BACKEND_CONTAINER_PORT=8000
+BACKEND_HOST_ADDRESS=127.0.0.1
+BACKEND_HOST_PORT=42001
+
+# Database
+POSTGRES_DB=db-lab-7
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+```
+
+### Deploy Commands
+
+1. **Stop any running bot process** (if migrating from nohup):
+
+   ```bash
+   pkill -f "bot.py" 2>/dev/null || true
+   ```
+
+2. **Build and start all services**:
+
+   ```bash
+   cd ~/se-toolkit-lab-7
+   docker compose --env-file .env.docker.secret up --build -d
+   ```
+
+3. **Verify services are running**:
+
+   ```bash
+   docker compose --env-file .env.docker.secret ps
+   ```
+
+   Expected output:
+
+   ```
+   NAME                    STATUS
+   backend                 Up
+   caddy                   Up
+   postgres                Up (healthy)
+   pgadmin                 Up
+   bot                     Up
+   ```
+
+4. **Check bot logs**:
+
+   ```bash
+   docker compose --env-file .env.docker.secret logs bot --tail 20
+   ```
+
+   Look for:
+   - "Bot started" — successful startup
+   - No Python tracebacks
+
+5. **Verify backend health**:
+
+   ```bash
+   curl -sf http://localhost:42002/docs -o /dev/null && echo "Backend: OK" || echo "Backend: FAIL"
+   ```
+
+### Troubleshooting
+
+| Symptom | Solution |
+|---------|----------|
+| Bot container restarting | Check logs: `docker compose logs bot` |
+| `/health` fails | Ensure `LMS_API_BASE_URL=http://backend:8000` (not localhost) |
+| LLM queries fail | Use `host.docker.internal` for LLM_API_BASE_URL |
+| BOT_TOKEN error | Add to `.env.docker.secret` |
+| Build fails at uv sync | Ensure `bot/uv.lock` exists and is copied in Dockerfile |
+
+### Verify in Telegram
+
+After deployment, test the bot in Telegram:
+
+1. `/start` — Welcome message
+2. `/health` — Backend status
+3. "what labs are available?" — Natural language query
+4. "which lab has lowest pass rate?" — Multi-step reasoning
+
+All commands should work from the containerized bot.

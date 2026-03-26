@@ -99,7 +99,7 @@ async def handle_scores(lab_name: str, api_client: Any = None) -> str:
     """Handle /scores command.
     
     Args:
-        lab_name: Name of the lab to check scores for.
+        lab_name: Name of the lab to check scores for (e.g., "lab-04" or "Lab 4").
         api_client: Optional LMS API client instance.
         
     Returns:
@@ -108,7 +108,7 @@ async def handle_scores(lab_name: str, api_client: Any = None) -> str:
     if not api_client:
         return f"📊 Scores for {lab_name}:\n\n(No API client configured)"
     
-    # Try to get pass rates
+    # Try to get pass rates first
     pass_rates = await api_client.get_pass_rates(lab_name)
     
     if pass_rates:
@@ -120,15 +120,29 @@ async def handle_scores(lab_name: str, api_client: Any = None) -> str:
             result += f"• {task_name}: {pass_rate:.1f}% ({attempts} attempts)\n"
         return result.strip()
     
-    # Fallback: try to get tasks for the lab
-    tasks = await api_client.get_tasks_for_lab(lab_name)
-    if tasks:
-        result = f"📊 Tasks for {lab_name}:\n\n"
-        for task in tasks:
-            title = task.get("title", "Unknown")
-            result += f"• {title}\n"
-        result += "\nUse /scores with the exact lab ID for detailed scores."
-        return result.strip()
+    # Normalize lab name for item lookup: "lab-04" -> "Lab 4"
+    lab_variants = [lab_name]
+    if lab_name.lower().startswith("lab-"):
+        # Convert "lab-04" to "Lab 4"
+        lab_num = lab_name.split("-")[1].lstrip("0")
+        lab_variants.append(f"Lab {lab_num}")
+        # Also try "Lab 04" format
+        lab_variants.append(f"Lab {lab_name.split('-')[1]}")
+    elif lab_name.lower().startswith("lab "):
+        # Already in "Lab X" format, try with leading zero
+        parts = lab_name.split()
+        if len(parts) > 1 and parts[1].isdigit():
+            lab_variants.append(f"Lab {int(parts[1]):02d}")
+    
+    # Fallback: try to get tasks for the lab using different name formats
+    for lab_title in lab_variants:
+        tasks = await api_client.get_tasks_for_lab(lab_title)
+        if tasks:
+            result = f"📊 Tasks for {lab_name}:\n\n"
+            for task in tasks:
+                title = task.get("title", "Unknown")
+                result += f"• {title}\n"
+            return result.strip()
     
     return f"❌ No data found for lab '{lab_name}'.\n\nCheck the lab name and try again."
 

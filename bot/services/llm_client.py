@@ -95,22 +95,14 @@ class LLMClient:
 
 
 def get_bot_tools() -> list[dict]:
-    """Define all available tools for the bot.
-    
-    Returns:
-        List of tool definitions in OpenAI format.
-    """
+    """Define all available tools for the bot."""
     return [
         {
             "type": "function",
             "function": {
                 "name": "get_health_status",
                 "description": "Check if the LMS backend is healthy and get item count",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "parameters": {"type": "object", "properties": {}, "required": []},
             },
         },
         {
@@ -118,11 +110,7 @@ def get_bot_tools() -> list[dict]:
             "function": {
                 "name": "list_labs",
                 "description": "Get list of all available labs with descriptions",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "parameters": {"type": "object", "properties": {}, "required": []},
             },
         },
         {
@@ -132,12 +120,7 @@ def get_bot_tools() -> list[dict]:
                 "description": "Get pass rates and scores for a specific lab",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "lab": {
-                            "type": "string",
-                            "description": "Lab identifier (e.g., 'lab-01', 'lab-04')",
-                        },
-                    },
+                    "properties": {"lab": {"type": "string", "description": "Lab identifier (e.g., 'lab-01', 'lab-04')"}},
                     "required": ["lab"],
                 },
             },
@@ -147,11 +130,7 @@ def get_bot_tools() -> list[dict]:
             "function": {
                 "name": "get_learners",
                 "description": "Get list of enrolled students/learners",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "parameters": {"type": "object", "properties": {}, "required": []},
             },
         },
         {
@@ -161,12 +140,7 @@ def get_bot_tools() -> list[dict]:
                 "description": "Get score distribution (4 buckets) for a lab",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "lab": {
-                            "type": "string",
-                            "description": "Lab identifier",
-                        },
-                    },
+                    "properties": {"lab": {"type": "string", "description": "Lab identifier"}},
                     "required": ["lab"],
                 },
             },
@@ -178,12 +152,7 @@ def get_bot_tools() -> list[dict]:
                 "description": "Get submission timeline for a lab",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "lab": {
-                            "type": "string",
-                            "description": "Lab identifier",
-                        },
-                    },
+                    "properties": {"lab": {"type": "string", "description": "Lab identifier"}},
                     "required": ["lab"],
                 },
             },
@@ -195,12 +164,7 @@ def get_bot_tools() -> list[dict]:
                 "description": "Get per-group performance for a lab",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "lab": {
-                            "type": "string",
-                            "description": "Lab identifier",
-                        },
-                    },
+                    "properties": {"lab": {"type": "string", "description": "Lab identifier"}},
                     "required": ["lab"],
                 },
             },
@@ -213,14 +177,8 @@ def get_bot_tools() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "lab": {
-                            "type": "string",
-                            "description": "Lab identifier",
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Number of top learners (default: 5)",
-                        },
+                        "lab": {"type": "string", "description": "Lab identifier"},
+                        "limit": {"type": "integer", "description": "Number of top learners (default: 5)"},
                     },
                     "required": ["lab"],
                 },
@@ -233,12 +191,7 @@ def get_bot_tools() -> list[dict]:
                 "description": "Get completion rate percentage for a lab",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "lab": {
-                            "type": "string",
-                            "description": "Lab identifier",
-                        },
-                    },
+                    "properties": {"lab": {"type": "string", "description": "Lab identifier"}},
                     "required": ["lab"],
                 },
             },
@@ -248,11 +201,7 @@ def get_bot_tools() -> list[dict]:
             "function": {
                 "name": "sync_data",
                 "description": "Trigger ETL sync to fetch latest data from autochecker",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "required": [],
-                },
+                "parameters": {"type": "object", "properties": {}, "required": []},
             },
         },
         {
@@ -260,10 +209,20 @@ def get_bot_tools() -> list[dict]:
             "function": {
                 "name": "get_help",
                 "description": "Get list of available commands and how to use the bot",
+                "parameters": {"type": "object", "properties": {}, "required": []},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "compare_labs",
+                "description": "Compare pass rates across multiple labs to find highest/lowest",
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": [],
+                    "properties": {
+                        "metric": {"type": "string", "description": "Comparison metric: 'pass_rate', 'completion', 'difficulty'"},
+                    },
+                    "required": ["metric"],
                 },
             },
         },

@@ -15,13 +15,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     uv sync --frozen --no-install-project
 
-# Copy bot source code
+# Copy bot source code and workspace files
 COPY bot/ /app/bot/
-COPY pyproject.toml /app/bot/pyproject.toml
+COPY pyproject.toml /app/pyproject.toml
+COPY uv.lock /app/uv.lock
 
 # Install the bot package
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /app/bot && uv sync --frozen
+    uv sync --frozen
 
 # ---
 # Runtime image

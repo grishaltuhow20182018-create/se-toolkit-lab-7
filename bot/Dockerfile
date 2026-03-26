@@ -17,10 +17,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy bot source code
 COPY bot/ /app/bot/
+COPY pyproject.toml /app/bot/pyproject.toml
 
 # Install the bot package
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen
+    cd /app/bot && uv sync --frozen
 
 # ---
 # Runtime image
